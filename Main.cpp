@@ -6,12 +6,21 @@
 #include <string.h>
 #include <map>
 #include <algorithm>
-#include "Life_range.hpp"
 
 using namespace std;
+struct Life_range_Node {
+    int start;
+    int end;
+    int reg = -1;
+    bool spill;
+}; 
 
+struct Life_range {
+    map<int, Life_range_Node> nodes;
+    int k;
+};
 // Retorna um vetor de todos os nós que estão expirados
-vector<int> get_expired_nodes( vector<int> Life_range_node, list<int> actives, map<int, Life_range_Node> nodes, int qtd_reg ) {
+vector<int> get_expired_nodes( vector<int> Life_range_node, list<int> actives, map<int, Life_range_Node> nodes) {
     vector<int> expired;
 
     for(auto &active_node : actives){
@@ -24,7 +33,7 @@ vector<int> get_expired_nodes( vector<int> Life_range_node, list<int> actives, m
 }
 
 
-int get_spill_node(int id_node, vector<int> Life_range_node, list<int> actives, map<int, Life_range_Node> nodes, int qtd_reg ){
+int get_spill_node(int id_node, vector<int> Life_range_node, list<int> actives, map<int, Life_range_Node> nodes){
     // Primeiramente coloca o nó que queremos adicionar para spill
     int spill_node = id_node;
     int bigest_start = Life_range_node[0];
@@ -47,7 +56,8 @@ int get_spill_node(int id_node, vector<int> Life_range_node, list<int> actives, 
 
         }else if(nodes[active_node].end == bigest_end){
             
-            if(nodes[active_node].end - nodes[active_node].start < smallest_range){
+            if( (nodes[active_node].end - nodes[active_node].start) < smallest_range){
+                cout << "chegou na segunda comparação mais interna" << endl;
                 bigest_start = nodes[active_node].start;
                 bigest_end = nodes[active_node].end;
                 smallest_range = nodes[active_node].end - nodes[active_node].start;
@@ -55,6 +65,7 @@ int get_spill_node(int id_node, vector<int> Life_range_node, list<int> actives, 
 
             }else if(nodes[active_node].end - nodes[active_node].start == smallest_range){
                 if(nodes[active_node].start > bigest_start){
+                    cout << "chegou na comparação mais interna" << endl;
                     bigest_start = nodes[active_node].start;
                     bigest_end = nodes[active_node].end;
                     smallest_range = nodes[active_node].end - nodes[active_node].start;
@@ -76,9 +87,7 @@ int main() {
 
     map<int, vector<int>> reg_map;
     list<int> actives; // lista de registradores ativos atualmente
-    vector<pair<int, int>> registers; // vetor de registradores que podem ou não podem ser utilizados
-    
-    // vector<pair<int, int>> registers;// Guarda o par Nó e registro do nó
+    map<int, vector<int>> pair_k_spill;
     Life_range Lr;
     
     // Loop para ler linha a linha da entrada padrão
@@ -116,27 +125,27 @@ int main() {
     } 
     
     // inicializar todos os registradores como vazios
-    for(int i = 0; i < k; i++){
-        registers.push_back(make_pair(i,1));        
-    }
+    
 
     int qtd_reg;
 
     for(qtd_reg = k; qtd_reg >= 2; qtd_reg--){
-        cout << "K = " << qtd_reg << endl;
-
+        pair_k_spill[qtd_reg];
+        cout << "K = " << qtd_reg << endl << endl;
+        vector<pair<int, int>> registers; // vetor de registradores que podem ou não podem ser utilizados
+        for(int i = 0; i < qtd_reg; i++){
+            registers.push_back(make_pair(i,1));        
+        }
+        int iteration = 0; 
         for(auto &rm : reg_map){
-            const vector<int> &node_life_time = rm.second;
-            
-            // TODO remover tempos de vidas expirados
-            vector<int> expired_nodes = get_expired_nodes(node_life_time, actives, Lr.nodes,qtd_reg);
+            vector<int> &node_life_time = rm.second;
+            vector<int> expired_nodes = get_expired_nodes(node_life_time, actives, Lr.nodes);
 
             if( expired_nodes.size() != 0){// Um ou mais nós expirados
                 
                 // Para cada nó expirado faça
                 for(auto &expired_node : expired_nodes){
                     // cout << "Nó expirado: " << expired_node << endl;
-                    //TODO remover 
                     int reg_expired = Lr.nodes[expired_node].reg;
 
                     // Achando o rint reg_spill = Lr.nodes[spill_node].reg;egistrador que está sendo utilizado pelo Nó expirado e liberando ele
@@ -153,15 +162,19 @@ int main() {
                 }
                 
             }else if(expired_nodes.size() == 0 && actives.size() == qtd_reg){//Se não tiver nenhum expirado e o ativos está cheio
-                int spill_node = get_spill_node(rm.first, node_life_time, actives, Lr.nodes,qtd_reg);
-                
-                // cout << "Nó mandado para spill: " << spill_node << endl;
+                int spill_node = get_spill_node(rm.first, node_life_time, actives, Lr.nodes);
+               
+                cout << "Nó que queremos inserir : " <<  rm.first << endl;
+
+                cout << "Nó mandado para spill: " << spill_node << endl;
                 
                 //Se o nó selecionado para spill não for o que queriamos adicionar
                 int reg_spill = Lr.nodes[spill_node].reg;
                 Lr.nodes[spill_node].spill = true;
-                // cout << "Registrador Usado pelo nó de spill: " << reg_spill << endl;
-
+                cout << "Registrador Usado pelo nó de spill: " << reg_spill << endl;
+                
+                pair_k_spill[qtd_reg].push_back(iteration);
+                
                 if(spill_node != rm.first){
                     // Achando o registrador que está sendo utilizado pelo Nó mandado para spill e liberando ele
                     for(int i = 0; i < registers.size(); i++){
@@ -171,15 +184,17 @@ int main() {
                         }
                     }
                     //Só faz sentido remover do actives se o nó que for para spill não seja o que ia ser adicionado, pois, o nó q seria adicionado não estava no spill
+
                     actives.remove(spill_node);
                 }
+                
             }else{
             // cout << "Nenhum nó expirado ou mandado para spill" << endl;
             }
 
 
             //Alocar registrador (com o menor numero) para o tempo de vida
-            for(auto &reg : registers){
+            for(auto &reg : registers){ 
                 if(reg.second == 1){ // Registrador Livre
 
                     Lr.nodes[rm.first].start = rm.second[0];
@@ -192,7 +207,9 @@ int main() {
                     break;
                 }
             }
-        }
+
+            iteration++;
+        } 
         
         for(auto &lr : Lr.nodes){
             cout << "vr" << lr.first << ": "; 
@@ -202,10 +219,35 @@ int main() {
                 cout << lr.second.reg << endl;;
             }
         }
+
+        Lr.nodes.clear();
+        registers.clear();
+        actives.clear();
+        cout << "----------------------------------------" << endl;
     }
     
+    cout << "----------------------------------------" << endl;
+    
+    // Itera sobre os elementos em ordem decrescente
+    for(auto it = pair_k_spill.rbegin(); it != pair_k_spill.rend(); ++it){
+        cout << "K = " << it->first << ": ";
+        
+        if(it->second.empty()){
+            cout << "Successful Allocation";
+        } else {
+            cout << "SPILL on interation(s): ";
+            for(auto spill_it = it->second.begin(); spill_it != it->second.end(); ++spill_it){
+                cout << *spill_it;
+                if(next(spill_it) != it->second.end()) {
+                    cout << ", ";
+                }
+            }
+        }
+        
+        if(next(it) != pair_k_spill.rend()) {
+            cout << endl;
+        }
+    }
 
-    cout << endl;
     return 0;
 }
-
