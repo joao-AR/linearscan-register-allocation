@@ -10,6 +10,7 @@
         int start;
         int end;
         int reg = -1;
+        bool spill;
     }; 
 
     struct Life_range {
